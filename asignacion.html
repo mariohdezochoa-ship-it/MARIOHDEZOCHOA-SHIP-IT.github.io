@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Control de Equipo</title>
+    
+    <!-- Metas para PWA / Android e iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="RGIS Control">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="apple-touch-icon" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/svgs/solid/barcode.svg">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <!-- FontAwesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SweetAlert2 para alertas elegantes -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        .step-panel { display: none; }
+        .step-panel.active { display: block; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Evita zoom en inputs en iOS (requiere 16px mínimo) */
+        input[type="text"] { font-size: 16px !important; }
+        
+        .matched-input-dark { background-color: rgba(16, 185, 129, 0.1) !important; border-color: #10b981 !important; color: #34d399 !important; }
+        .matched-input-light { background-color: rgba(16, 185, 129, 0.15) !important; border-color: #059669 !important; color: #065f46 !important; }
+        .error-input-dark { background-color: rgba(239, 68, 68, 0.1) !important; border-color: #ef4444 !important; color: #f87171 !important; }
+        .error-input-light { background-color: rgba(239, 68, 68, 0.15) !important; border-color: #dc2626 !important; color: #991b1b !important; }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #334155; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-100 via-slate-200 to-indigo-100 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 min-h-screen text-slate-800 dark:text-slate-100 flex flex-col justify-between font-sans selection:bg-indigo-500 selection:text-white transition-colors duration-300">
+
+    <!-- Header -->
+    <header class="w-full py-3 px-4 sm:px-10 bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800/80 sticky top-0 z-50 shadow-sm dark:shadow-xl transition-colors duration-300">
+        <div class="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div class="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-start">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-gradient-to-tr from-indigo-600 to-violet-500 p-2.5 rounded-2xl shadow-lg shadow-indigo-600/30 flex items-center justify-center">
+                        <i class="fa-solid fa-barcode text-xl text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                            Control de Equipos <span class="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 font-semibold">RM3 & Finger</span>
+                        </h1>
+                        <p class="text-xs text-slate-500 dark:text-slate-400"></p>
+                    </div>
+                </div>
+                <!-- Botón de Modo Oscuro / Claro en móvil (arriba a la derecha) -->
+                <button onclick="toggleDarkMode()" aria-label="Cambiar modo oscuro/claro" class="sm:hidden p-2.5 rounded-xl bg-slate-200 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 text-slate-700 dark:text-amber-400 shadow-sm cursor-pointer flex items-center justify-center">
+                    <i id="themeIconMobile" class="fa-solid fa-moon text-base"></i>
+                </button>
+            </div>
+            
+            <div class="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-end">
+                <!-- Botón de Modo Oscuro / Claro en PC -->
+                <button onclick="toggleDarkMode()" aria-label="Cambiar modo oscuro/claro" class="hidden sm:flex p-3 rounded-2xl bg-slate-200 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 text-slate-700 dark:text-amber-400 hover:scale-105 transition-all shadow-sm cursor-pointer items-center justify-center">
+                    <i id="themeIcon" class="fa-solid fa-moon text-lg"></i>
+                </button>
+
+                <!-- Botones de Modo -->
+                <div class="inline-flex rounded-2xl bg-slate-200 dark:bg-slate-900 p-1.5 border border-slate-300 dark:border-slate-800 shadow-inner w-full sm:w-auto justify-center">
+                    <button onclick="cambiarModo('asignar')" id="btnModoAsignar" class="flex-1 sm:flex-initial px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 flex items-center justify-center space-x-2 bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 cursor-pointer">
+                        <i class="fa-solid fa-user-plus"></i>
+                        <span>Asignar</span>
+                    </button>
+                    <button onclick="cambiarModo('entregar')" id="btnModoEntregar" class="flex-1 sm:flex-initial px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 flex items-center justify-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer">
+                        <i class="fa-solid fa-clipboard-check"></i>
+                        <span>Devolución</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl w-full mx-auto p-3 sm:p-6 my-4 flex-grow">
+
+        <!-- SECCIÓN: ASIGNAR -->
+        <div id="seccionAsignar" class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl border border-slate-200 dark:border-slate-800/80 rounded-3xl shadow-xl dark:shadow-2xl p-5 sm:p-8 relative overflow-hidden transition-all">
+            <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+            
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2 border-b border-slate-200 dark:border-slate-800/60 pb-4">
+                <div>
+                    <h3 class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white flex items-center space-x-2.5">
+                        <span class="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20"><i class="fa-solid fa-shield-halved"></i></span>
+                        <span>Módulo de Asignación</span>
+                    </h3>
+                </div>
+                <span id="lblPasoAsignar" class="px-3.5 py-1.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-bold rounded-xl border border-indigo-500/20 tracking-wide uppercase">Paso 1 de 3</span>
+            </div>
+
+            <!-- Paso 1: ID -->
+            <div id="pasoAsig1" class="step-panel active space-y-5">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">1. Escanee o ingrese el ID de la Persona</label>
+                    <div class="relative group">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 dark:text-slate-500 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400 transition-colors"><i class="fa-solid fa-id-card text-lg"></i></span>
+                        <input type="text" id="asigId" inputmode="text" autocomplete="off" class="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700/80 rounded-2xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all shadow-inner" placeholder="Escanee ID de persona..." autofocus>
+                    </div>
+                </div>
+                <button onclick="avanzarDeAsignar1()" class="w-full py-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold rounded-2xl shadow-lg shadow-indigo-600/30 transition-all transform active:scale-[0.99] flex items-center justify-center space-x-2 cursor-pointer">
+                    <span>Siguiente Paso</span> <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+
+            <!-- Paso 2: RM3 -->
+            <div id="pasoAsig2" class="step-panel space-y-5">
+                <div class="bg-slate-100 dark:bg-slate-950/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-sm shadow-inner">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-500/10 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-xs"><i class="fa-solid fa-user"></i></div>
+                        <span class="text-slate-600 dark:text-slate-400">Persona ID: <strong id="showAsigId" class="text-indigo-600 dark:text-indigo-300 font-mono text-base ml-1"></strong></span>
+                    </div>
+                    <button onclick="reiniciarAsignacion()" class="text-xs px-3 py-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 rounded-lg border border-rose-500/20 transition-all cursor-pointer font-medium flex items-center gap-1.5">
+                        <i class="fa-solid fa-rotate-right"></i> Reiniciar
+                    </button>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">2. Escanee el Código del RM3</label>
+                    <div class="relative group">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 dark:text-slate-500 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400 transition-colors"><i class="fa-solid fa-barcode text-lg"></i></span>
+                        <input type="text" id="asigRm3" inputmode="text" autocomplete="off" class="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700/80 rounded-2xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all shadow-inner" placeholder="Escanee serial del RM3...">
+                    </div>
+                </div>
+                <button onclick="avanzarDeAsignar2()" class="w-full py-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold rounded-2xl shadow-lg shadow-indigo-600/30 transition-all transform active:scale-[0.99] flex items-center justify-center space-x-2 cursor-pointer">
+                    <span>Siguiente Paso</span> <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+
+            <!-- Paso 3: Finger -->
+            <div id="pasoAsig3" class="step-panel space-y-5">
+                <div class="bg-slate-100 dark:bg-slate-950/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row justify-between gap-3 text-sm shadow-inner">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-slate-600 dark:text-slate-400">ID: <strong class="text-indigo-600 dark:text-indigo-300 font-mono" id="showAsigId2"></strong></span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-slate-600 dark:text-slate-400">RM3: <strong class="text-emerald-600 dark:text-emerald-400 font-mono" id="showAsigRm3"></strong></span>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">3. Escanee el Código del Finger <span class="text-xs text-slate-400 font-normal">(o pulse botón si no usa)</span></label>
+                    <div class="relative group">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 dark:text-slate-500 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400 transition-colors"><i class="fa-solid fa-fingerprint text-lg"></i></span>
+                        <input type="text" id="asigFinger" inputmode="text" autocomplete="off" class="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700/80 rounded-2xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all shadow-inner" placeholder="Escanee finger o presione Enter...">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    <button onclick="guardarAsignacion('NO APLICA')" class="py-3.5 bg-slate-200 dark:bg-slate-800/80 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-2xl border border-slate-300 dark:border-slate-700 transition-all flex items-center justify-center space-x-2 cursor-pointer">
+                        <i class="fa-solid fa-ban text-slate-500 dark:text-slate-400"></i> <span>No usa Finger</span>
+                    </button>
+                    <button onclick="procesarGuardadoFingerInput()" class="py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-2xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center space-x-2 cursor-pointer">
+                        <i class="fa-solid fa-check-circle"></i> <span>Guardar Asignación</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN: ENTREGAR / DEVOLVER -->
+        <div id="seccionEntregar" class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl border border-slate-200 dark:border-slate-800/80 rounded-3xl shadow-xl dark:shadow-2xl p-5 sm:p-8 relative overflow-hidden hidden transition-all">
+            <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500"></div>
+
+            <div class="flex items-center justify-between mb-6 border-b border-slate-200 dark:border-slate-800/60 pb-4">
+                <h3 class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white flex items-center space-x-2.5">
+                    <span class="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"><i class="fa-solid fa-rotate-left"></i></span>
+                    <span>Módulo de Devolución / Entrega</span>
+                </h3>
+            </div>
+
+            <!-- Buscar ID Entrega -->
+            <div id="pasoEntrega1" class="step-panel active space-y-5">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Escanee el ID de la persona que entrega el equipo</label>
+                    <div class="relative group">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 dark:text-slate-500 group-focus-within:text-amber-500 transition-colors"><i class="fa-solid fa-id-card text-lg"></i></span>
+                        <input type="text" id="entregaIdBusqueda" inputmode="text" autocomplete="off" class="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700/80 rounded-2xl focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all shadow-inner" placeholder="Escanee ID para buscar asignación...">
+                    </div>
+                </div>
+                <button onclick="buscarPersonaEntrega()" class="w-full py-4 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold rounded-2xl shadow-lg shadow-amber-600/30 transition-all transform active:scale-[0.99] flex items-center justify-center space-x-2 cursor-pointer">
+                    <span>Buscar Asignación Activa</span> <i class="fa-solid fa-search"></i>
+                </button>
+            </div>
+
+            <!-- Validación de Seriales para Entrega -->
+            <div id="pasoEntrega2" class="step-panel space-y-5">
+                <div class="bg-slate-100 dark:bg-slate-950/60 p-5 rounded-2xl border border-slate-200 dark:border-slate-800/80 space-y-3 shadow-inner">
+                    <div class="flex justify-between items-center border-b border-slate-200 dark:border-slate-800/60 pb-3">
+                        <span class="text-slate-600 dark:text-slate-400 text-sm font-medium">Asignado a Persona:</span>
+                        <span id="showEntregandoPersona" class="font-mono font-bold text-amber-600 dark:text-amber-400 text-lg px-3 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/20"></span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        <div class="bg-white dark:bg-slate-900/80 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <span class="text-xs text-slate-500 dark:text-slate-400 block mb-1">RM3 Registrado:</span>
+                            <span id="origRm3Show" class="font-mono font-semibold text-slate-800 dark:text-slate-200 text-sm"></span>
+                        </div>
+                        <div class="bg-white dark:bg-slate-900/80 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <span class="text-xs text-slate-500 dark:text-slate-400 block mb-1">Finger Registrado:</span>
+                            <span id="origFingerShow" class="font-mono font-semibold text-slate-800 dark:text-slate-200 text-sm"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-barcode text-indigo-600 dark:text-indigo-400"></i> Vuelva a escanear el RM3 para validar:</label>
+                        <input type="text" id="validaRm3Input" inputmode="text" autocomplete="off" class="w-full px-4 py-3.5 bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-white font-mono outline-none transition-all focus:ring-2 focus:ring-amber-500/50" placeholder="Escanee RM3..." oninput="validarSerialesEntrega()" onkeydown="manejarEnterValidacion(event, 'rm3')">
+                    </div>
+
+                    <div id="validaFingerContainer">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-fingerprint text-purple-600 dark:text-purple-400"></i> Vuelva a escanear el Finger para validar:</label>
+                        <input type="text" id="validaFingerInput" inputmode="text" autocomplete="off" class="w-full px-4 py-3.5 bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-white font-mono outline-none transition-all focus:ring-2 focus:ring-amber-500/50" placeholder="Escanee finger..." oninput="validarSerialesEntrega()" onkeydown="manejarEnterValidacion(event, 'finger')">
+                    </div>
+                </div>
+
+                <div class="flex space-x-3 pt-2">
+                    <button onclick="reiniciarEntrega()" class="w-full py-3.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-2xl transition-all cursor-pointer flex items-center justify-center space-x-2 border border-slate-300 dark:border-slate-700/80">
+                        <i class="fa-solid fa-arrow-left"></i> <span>Cancelar / Volver</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Historial / Tabla -->
+        <div class="mt-8 bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-slate-200 dark:border-slate-800/80 rounded-3xl p-5 sm:p-6 shadow-xl dark:shadow-2xl">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-3">
+                <h4 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center space-x-2.5">
+                    <span class="p-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300"><i class="fa-solid fa-list-ul"></i></span>
+                    <span>Historial de Movimientos</span>
+                </h4>
+                <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                    <button onclick="exportarExcelCSV()" class="flex-1 sm:flex-initial text-xs px-4 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/30 transition-all flex items-center justify-center space-x-2 cursor-pointer font-bold shadow-sm">
+                        <i class="fa-solid fa-file-excel text-sm"></i> <span>Exportar Excel</span>
+                    </button>
+                    <button onclick="borrarTodoHistorial()" class="flex-1 sm:flex-initial text-xs px-4 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl border border-rose-500/30 transition-all flex items-center justify-center space-x-2 cursor-pointer font-bold shadow-sm">
+                        <i class="fa-solid fa-trash-can text-sm"></i> <span>Borrar Todo</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-950/40">
+                <table class="w-full text-left text-sm text-slate-700 dark:text-slate-300 min-w-[650px]">
+                    <thead class="bg-slate-200/70 dark:bg-slate-950/90 text-xs uppercase text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 font-semibold tracking-wider">
+                        <tr>
+                            <th class="p-3.5">ID Persona</th>
+                            <th class="p-3.5">RM3 CODIGO</th>
+                            <th class="p-3.5">Finger </th>
+                            <th class="p-3.5">Estado</th>
+                            <th class="p-3.5">Asignación</th>
+                            <th class="p-3.5">Entrega</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaCuerpo" class="divide-y divide-slate-200 dark:divide-slate-800/50">
+                        <!-- Dinámico -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center py-6 text-xs text-slate-500 border-t border-slate-200 dark:border-slate-800/60 bg-white/40 dark:bg-slate-950/40 transition-colors duration-300">
+         &bull;  &bull; 
+    </footer>
+
+    <!-- Script Principal -->
+    <script>
+        let memoriaAsignacion = { id: '', rm3: '' };
+        let registroEnProcesoEntrega = null;
+
+        // Gestión de Tema (Oscuro / Claro)
+        function inicializarTema() {
+            let temaGuardado = localStorage.getItem('control_equipos_theme');
+            const htmlTag = document.documentElement;
+            const themeIcon = document.getElementById('themeIcon');
+            const themeIconMobile = document.getElementById('themeIconMobile');
+
+            let usarOscuro = true;
+            if (temaGuardado === 'light') {
+                usarOscuro = false;
+            } else if (temaGuardado === 'dark') {
+                usarOscuro = true;
+            } else {
+                usarOscuro = !window.matchMedia('(prefers-color-scheme: light)').matches;
+            }
+
+            if (usarOscuro) {
+                htmlTag.classList.add('dark');
+                if(themeIcon) themeIcon.className = "fa-solid fa-moon text-lg";
+                if(themeIconMobile) themeIconMobile.className = "fa-solid fa-moon text-base";
+            } else {
+                htmlTag.classList.remove('dark');
+                if(themeIcon) themeIcon.className = "fa-solid fa-sun text-lg";
+                if(themeIconMobile) themeIconMobile.className = "fa-solid fa-sun text-base";
+            }
+        }
+
+        function toggleDarkMode() {
+            const htmlTag = document.documentElement;
+            const themeIcon = document.getElementById('themeIcon');
+            const themeIconMobile = document.getElementById('themeIconMobile');
+
+            if (htmlTag.classList.contains('dark')) {
+                htmlTag.classList.remove('dark');
+                localStorage.setItem('control_equipos_theme', 'light');
+                if(themeIcon) themeIcon.className = "fa-solid fa-sun text-lg";
+                if(themeIconMobile) themeIconMobile.className = "fa-solid fa-sun text-base";
+            } else {
+                htmlTag.classList.add('dark');
+                localStorage.setItem('control_equipos_theme', 'dark');
+                if(themeIcon) themeIcon.className = "fa-solid fa-moon text-lg";
+                if(themeIconMobile) themeIconMobile.className = "fa-solid fa-moon text-base";
+            }
+        }
+
+        function obtenerBaseDatos() {
+            try {
+                let data = sessionStorage.getItem('control_equipos_db_memory');
+                return data ? JSON.parse(data) : [];
+            } catch (e) {
+                return window.globalMemoryDB || [];
+            }
+        }
+
+        function guardarBaseDatos(lista) {
+            window.globalMemoryDB = lista;
+            try {
+                sessionStorage.setItem('control_equipos_db_memory', JSON.stringify(lista));
+            } catch (e) {}
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            inicializarTema();
+            refrescarTablaRegistros();
+            configurarPistolaEnter();
+        });
+
+        function configurarPistolaEnter() {
+            document.getElementById('asigId').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); avanzarDeAsignar1(); }
+            });
+            document.getElementById('asigRm3').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); avanzarDeAsignar2(); }
+            });
+            document.getElementById('asigFinger').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    let val = document.getElementById('asigFinger').value.trim();
+                    guardarAsignacion(val ? val : 'NO APLICA');
+                }
+            });
+            document.getElementById('entregaIdBusqueda').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); buscarPersonaEntrega(); }
+            });
+        }
+
+        function cambiarModo(modo) {
+            const esAsignar = (modo === 'asignar');
+            document.getElementById('seccionAsignar').classList.toggle('hidden', !esAsignar);
+            document.getElementById('seccionEntregar').classList.toggle('hidden', esAsignar);
+
+            document.getElementById('btnModoAsignar').className = esAsignar 
+                ? "flex-1 sm:flex-initial px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 flex items-center justify-center space-x-2 bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 cursor-pointer"
+                : "flex-1 sm:flex-initial px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 flex items-center justify-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer";
+
+            document.getElementById('btnModoEntregar').className = !esAsignar 
+                ? "flex-1 sm:flex-initial px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 flex items-center justify-center space-x-2 bg-amber-600 text-white shadow-lg shadow-amber-600/25 cursor-pointer"
+                : "flex-1 sm:flex-initial px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 flex items-center justify-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer";
+
+            if (esAsignar) reiniciarAsignacion();
+            else reiniciarEntrega();
+        }
+
+        function reiniciarAsignacion() {
+            memoriaAsignacion = { id: '', rm3: '' };
+            document.getElementById('asigId').value = '';
+            document.getElementById('asigRm3').value = '';
+            document.getElementById('asigFinger').value = '';
+            
+            document.getElementById('pasoAsig1').classList.add('active');
+            document.getElementById('pasoAsig2').classList.remove('active');
+            document.getElementById('pasoAsig3').classList.remove('active');
+            document.getElementById('lblPasoAsignar').innerText = 'Paso 1 de 3';
+            
+            setTimeout(() => document.getElementById('asigId').focus(), 100);
+        }
+
+        function avanzarDeAsignar1() {
+            let val = document.getElementById('asigId').value.trim();
+            if(!val) { Swal.fire({ icon: 'warning', title: 'Atención', text: 'Escanee o ingrese el ID de la persona', confirmButtonColor: '#4f46e5' }); return; }
+
+            let lista = obtenerBaseDatos();
+            let activoExistente = lista.find(r => r.idPersona === val && r.estado === 'ACTIVO');
+
+            if(activoExistente) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: '¡Equipo ya asignado!',
+                    html: `Esta persona (<b class="text-indigo-600 dark:text-indigo-400">${val}</b>) ya cuenta con un equipo activo en este momento.`,
+                    confirmButtonColor: '#4f46e5'
+                });
+                return;
+            }
+
+            memoriaAsignacion.id = val;
+            document.getElementById('showAsigId').innerText = val;
+            
+            document.getElementById('pasoAsig1').classList.remove('active');
+            document.getElementById('pasoAsig2').classList.add('active');
+            document.getElementById('lblPasoAsignar').innerText = 'Paso 2 de 3';
+            document.getElementById('asigRm3').value = '';
+            setTimeout(() => document.getElementById('asigRm3').focus(), 100);
+        }
+
+        function avanzarDeAsignar2() {
+            let val = document.getElementById('asigRm3').value.trim();
+            if(!val) { Swal.fire({ icon: 'warning', title: 'Atención', text: 'Escanee o ingrese el código del RM3', confirmButtonColor: '#4f46e5' }); return; }
+
+            let lista = obtenerBaseDatos();
+            
+            // VALIDACIÓN NUEVA: Si el código RM3 ya fue asignado previamente en CUALQUIER registro (ACTIVO o DEVUELTO), se bloquea para evitar reasignaciones
+            let codigoHistoricoUsado = lista.find(r => r.rm3 === val);
+            if(codigoHistoricoUsado) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Código No disponible',
+                    html: `El equipo RM3 <b class="text-indigo-600 dark:text-indigo-400">${val}</b> ya fue asignado previamente (Historial de ID: ${codigoHistoricoUsado.idPersona}). Este código ya no se puede volver a asignar.`,
+                    confirmButtonColor: '#ef4444'
+                });
+                return;
+            }
+
+            let rm3EnUso = lista.find(r => r.rm3 === val && r.estado === 'ACTIVO');
+
+            if(rm3EnUso) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'RM3 Ocupado',
+                    text: `El equipo RM3 "${val}" ya se encuentra asignado a otra persona.`,
+                    confirmButtonColor: '#ef4444'
+                });
+                return;
+            }
+
+            memoriaAsignacion.rm3 = val;
+            document.getElementById('showAsigId2').innerText = memoriaAsignacion.id;
+            document.getElementById('showAsigRm3').innerText = val;
+
+            document.getElementById('pasoAsig2').classList.remove('active');
+            document.getElementById('pasoAsig3').classList.add('active');
+            document.getElementById('lblPasoAsignar').innerText = 'Paso 3 de 3';
+            document.getElementById('asigFinger').value = '';
+            setTimeout(() => document.getElementById('asigFinger').focus(), 100);
+        }
+
+        function procesarGuardadoFingerInput() {
+            let val = document.getElementById('asigFinger').value.trim();
+            guardarAsignacion(val ? val : 'NO APLICA');
+        }
+
+        function guardarAsignacion(fingerVal) {
+            let lista = obtenerBaseDatos();
+
+            if(fingerVal !== 'NO APLICA') {
+                // VALIDACIÓN NUEVA: Si el código Finger ya fue asignado previamente en CUALQUIER registro (ACTIVO o DEVUELTO), se bloquea
+                let fingerHistoricoUsado = lista.find(r => r.finger === fingerVal);
+                if(fingerHistoricoUsado) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Código No disponible',
+                        html: `El dispositivo Finger <b class="text-purple-600 dark:text-purple-400">${fingerVal}</b> ya fue asignado previamente. Este código ya no se puede volver a asignar.`,
+                        confirmButtonColor: '#ef4444'
+                    });
+                    return;
+                }
+
+                let fingerEnUso = lista.find(r => r.finger === fingerVal && r.estado === 'ACTIVO');
+                if(fingerEnUso) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Finger Ocupado',
+                        text: `El dispositivo Finger "${fingerVal}" ya se encuentra asignado.`,
+                        confirmButtonColor: '#ef4444'
+                    });
+                    return;
+                }
+            }
+
+            let nuevoRegistro = {
+                idPersona: memoriaAsignacion.id,
+                rm3: memoriaAsignacion.rm3,
+                finger: fingerVal,
+                estado: 'ACTIVO',
+                fechaAsignacion: new Date().toLocaleString(),
+                fechaEntrega: '-'
+            };
+
+            lista.unshift(nuevoRegistro);
+            guardarBaseDatos(lista);
+            refrescarTablaRegistros();
+
+            Swal.fire({
+                icon: 'success',
+                title: '¡Asignación Exitosa!',
+                text: `Equipo asignado correctamente a ID: ${memoriaAsignacion.id}`,
+                timer: 1800,
+                showConfirmButton: false
+            });
+
+            reiniciarAsignacion();
+        }
+
+        function buscarPersonaEntrega() {
+            let val = document.getElementById('entregaIdBusqueda').value.trim();
+            if(!val) { Swal.fire({ icon: 'warning', title: 'Atención', text: 'Ingrese o escanee el ID de la persona', confirmButtonColor: '#d97706' }); return; }
+
+            let lista = obtenerBaseDatos();
+            let activo = lista.find(r => r.idPersona === val && r.estado === 'ACTIVO');
+
+            if(!activo) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Sin Asignación Activa',
+                    text: `No se encontró ningún equipo activo registrado para la persona con ID: ${val}`,
+                    confirmButtonColor: '#d97706'
+                });
+                return;
+            }
+
+            registroEnProcesoEntrega = activo;
+            document.getElementById('showEntregandoPersona').innerText = activo.idPersona;
+            document.getElementById('origRm3Show').innerText = activo.rm3;
+            document.getElementById('origFingerShow').innerText = activo.finger;
+
+            if(activo.finger === 'NO APLICA') {
+                document.getElementById('validaFingerContainer').style.display = 'none';
+            } else {
+                document.getElementById('validaFingerContainer').style.display = 'block';
+            }
+
+            document.getElementById('pasoEntrega1').classList.remove('active');
+            document.getElementById('pasoEntrega2').classList.add('active');
+            document.getElementById('validaRm3Input').value = '';
+            document.getElementById('validaFingerInput').value = '';
+            setTimeout(() => document.getElementById('validaRm3Input').focus(), 100);
+        }
+
+        function validarSerialesEntrega() {
+            if(!registroEnProcesoEntrega) return;
+
+            let rm3InputVal = document.getElementById('validaRm3Input').value.trim();
+            let fingerInputVal = document.getElementById('validaFingerInput').value.trim();
+            let usaFinger = (registroEnProcesoEntrega.finger !== 'NO APLICA');
+
+            let rm3Ok = (rm3InputVal === registroEnProcesoEntrega.rm3);
+            let fingerOk = !usaFinger || (fingerInputVal === registroEnProcesoEntrega.finger);
+
+            let rm3Elem = document.getElementById('validaRm3Input');
+            let fingerElem = document.getElementById('validaFingerInput');
+            let esOscuro = document.documentElement.classList.contains('dark');
+
+            if(rm3InputVal.length > 0) {
+                if(rm3Ok) {
+                    rm3Elem.className = "w-full px-4 py-3.5 border rounded-xl font-mono outline-none transition-all " + (esOscuro ? "matched-input-dark" : "matched-input-light");
+                } else {
+                    rm3Elem.className = "w-full px-4 py-3.5 border rounded-xl font-mono outline-none transition-all " + (esOscuro ? "error-input-dark" : "error-input-light");
+                }
+            } else {
+                rm3Elem.className = "w-full px-4 py-3.5 bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-white font-mono outline-none transition-all focus:ring-2 focus:ring-amber-500/50";
+            }
+
+            if(usaFinger && fingerInputVal.length > 0) {
+                if(fingerOk) {
+                    fingerElem.className = "w-full px-4 py-3.5 border rounded-xl font-mono outline-none transition-all " + (esOscuro ? "matched-input-dark" : "matched-input-light");
+                } else {
+                    fingerElem.className = "w-full px-4 py-3.5 border rounded-xl font-mono outline-none transition-all " + (esOscuro ? "error-input-dark" : "error-input-light");
+                }
+            } else if (usaFinger) {
+                fingerElem.className = "w-full px-4 py-3.5 bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-white font-mono outline-none transition-all focus:ring-2 focus:ring-amber-500/50";
+            }
+
+            if(rm3Ok && fingerOk) {
+                let lista = obtenerBaseDatos();
+                let index = lista.findIndex(r => r.idPersona === registroEnProcesoEntrega.idPersona && r.rm3 === registroEnProcesoEntrega.rm3 && r.estado === 'ACTIVO');
+                
+                if(index !== -1) {
+                    lista[index].estado = 'DEVUELTO';
+                    lista[index].fechaEntrega = new Date().toLocaleString();
+                    guardarBaseDatos(lista);
+                    refrescarTablaRegistros();
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Devolución Exitosa!',
+                        text: 'Los seriales coinciden correctamente y el equipo ha sido liberado.',
+                        timer: 1800,
+                        showConfirmButton: false
+                    });
+
+                    reiniciarEntrega();
+                }
+            }
+        }
+
+        function manejarEnterValidacion(event, tipo) {
+            if(event.key === 'Enter') {
+                event.preventDefault();
+                validarSerialesEntrega();
+                if(tipo === 'rm3' && registroEnProcesoEntrega && registroEnProcesoEntrega.finger !== 'NO APLICA') {
+                    document.getElementById('validaFingerInput').focus();
+                }
+            }
+        }
+
+        function reiniciarEntrega() {
+            registroEnProcesoEntrega = null;
+            document.getElementById('entregaIdBusqueda').value = '';
+            document.getElementById('validaRm3Input').value = '';
+            document.getElementById('validaFingerInput').value = '';
+            
+            document.getElementById('pasoEntrega1').classList.add('active');
+            document.getElementById('pasoEntrega2').classList.remove('active');
+            setTimeout(() => document.getElementById('entregaIdBusqueda').focus(), 100);
+        }
+
+        function refrescarTablaRegistros() {
+            let lista = obtenerBaseDatos();
+            let tbody = document.getElementById('tablaCuerpo');
+            tbody.innerHTML = '';
+
+            if(lista.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400 dark:text-slate-500 italic">No hay registros de movimientos aún.</td></tr>`;
+                return;
+            }
+
+            lista.forEach((reg) => {
+                let tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-100/50 dark:hover:bg-slate-900/40 transition-colors";
+                
+                let badgeEstado = reg.estado === 'ACTIVO' 
+                    ? '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">ACTIVO</span>'
+                    : '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-500/10 text-slate-500 dark:text-slate-400 border border-slate-500/20">DEVUELTO</span>';
+
+                tr.innerHTML = `
+                    <td class="p-3.5 font-mono font-semibold text-slate-800 dark:text-slate-200">${reg.idPersona}</td>
+                    <td class="p-3.5 font-mono text-indigo-600 dark:text-indigo-400">${reg.rm3}</td>
+                    <td class="p-3.5 font-mono text-purple-600 dark:text-purple-400">${reg.finger}</td>
+                    <td class="p-3.5">${badgeEstado}</td>
+                    <td class="p-3.5 text-xs text-slate-500 dark:text-slate-400">${reg.fechaAsignacion}</td>
+                    <td class="p-3.5 text-xs text-slate-500 dark:text-slate-400">${reg.fechaEntrega}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function borrarTodoHistorial() {
+            Swal.fire({
+                title: '¿Estás seguro?',
+                text: "Se borrará todo el historial de movimientos almacenado.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Sí, borrar todo',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    guardarBaseDatos([]);
+                    refrescarTablaRegistros();
+                    Swal.fire({ icon: 'success', title: 'Borrado', text: 'Historial vaciado con éxito.', timer: 1500, showConfirmButton: false });
+                }
+            });
+        }
+
+        function exportarExcelCSV() {
+            let lista = obtenerBaseDatos();
+            if(lista.length === 0) {
+                Swal.fire({ icon: 'info', title: 'Sin datos', text: 'No hay registros para exportar.', confirmButtonColor: '#4f46e5' });
+                return;
+            }
+
+            let csvContent = "\uFEFFID Persona,RM3 Serial,Finger Serial,Estado,Fecha Asignacion,Fecha Entrega\n";
+            lista.forEach(r => {
+                csvContent += `"${r.idPersona}","${r.rm3}","${r.finger}","${r.estado}","${r.fechaAsignacion}","${r.fechaEntrega}"\n`;
+            });
+
+            let blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', `Control_Equipos_RGIS_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    </script>
+</body>
+</html>
